@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Admin Dashboard - Stonoteniska liga BiH</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="logo">Stonoteniska liga BiH - Admin</div>
+    <div class="dropdown">
+      <button class="dropbtn">Categories</button>
+      <div class="dropdown-content">
+        <a href="#">Premijer liga</a>
+        <a href="#">Prva liga FBiH</a>
+        <a href="#">Druga liga FBiH</a>
+        <a href="#">Treca liga FBiH</a>
+        <a href="#">Prva liga RS</a>
+        <a href="#">Druga liga RS</a>
+        <a href="#">Premijer liga Žene</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h2>Welcome, Admin!</h2>
+    
+    <div class="section">
+      <h3>Create a New Tournament</h3>
+      <form id="createTournamentForm">
+        <label for="tournamentName">Tournament Name:</label>
+        <input type="text" id="tournamentName" required />
+        
+        <label for="tournamentFormat">Format:</label>
+        <select id="tournamentFormat">
+          <option value="roundRobin">Round Robin</option>
+          <option value="groups">Group Stage</option>
+        </select>
+        
+        <button type="submit">Create Tournament</button>
+      </form>
+    </div>
+
+    <hr />
+
+    <div class="section">
+      <h3>Existing Tournaments</h3>
+      <div id="tournamentsList"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+<script>
+  initDashboard();
+</script>
+</body>
+</html>
+

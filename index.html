@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stonoteniska liga BiH - Login</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="login-container">
+    <h1>Stonoteniska liga BiH</h1>
+    <form id="loginForm">
+      <div>
+        <label for="username">Username</label>
+        <input type="text" id="username" required />
+      </div>
+      <div>
+        <label for="password">Password</label>
+        <input type="password" id="password" required />
+      </div>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    loginForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      // Very simple check: If admin / admin, redirect to dashboard
+      if (username === 'admin' && password === 'admin') {
+        window.location.href = 'dashboard.html';
+      } else {
+        alert('Invalid credentials! Try username=admin, password=admin');
+      }
+    });
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

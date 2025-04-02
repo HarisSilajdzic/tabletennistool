@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tournament View</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1 id="tournamentTitle">Loading tournament...</h1>
+
+    <section id="matchesSection">
+      <h2>Matches</h2>
+      <div id="matchesList"></div>
+    </section>
+
+    <section id="tableSection">
+      <h2>Standings</h2>
+      <div id="standingsTable"></div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    function initTournamentPage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const nameParam = urlParams.get('t');
+
+      if (!nameParam) {
+        document.getElementById('tournamentTitle').textContent = "No tournament specified.";
+        return;
+      }
+
+      const tournamentName = nameParam.replaceAll('_', ' ');
+      document.getElementById('tournamentTitle').textContent = tournamentName;
+
+      const tournaments = getTournaments();
+      const tournament = tournaments.find(t => t.name.toLowerCase() === tournamentName.toLowerCase());
+
+      if (!tournament) {
+        document.getElementById('matchesList').innerHTML = "<p>Tournament not found.</p>";
+        return;
+      }
+
+      document.getElementById('matchesList').innerHTML = renderMatchesHtml(tournament);
+      document.getElementById('standingsTable').innerHTML = generateStandingsTable(tournament);
+    }
+
+    initTournamentPage();
+  </script>
+</body>
+</html>
