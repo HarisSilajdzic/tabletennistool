@@ -45,12 +45,10 @@ function getTournaments() {
   return data ? JSON.parse(data) : [];
 }
 
-// Helper to save tournaments to localStorage
 function saveTournaments(tournaments) {
   localStorage.setItem('tournaments', JSON.stringify(tournaments));
 }
 
-// Generate a simple unique ID (not perfect but okay for demo)
 function generateId() {
   return '_' + Math.random().toString(36).substr(2, 9);
 }
@@ -67,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const name = document.getElementById('tournamentName').value;
       const format = document.getElementById('tournamentFormat').value;
-      createTournament(name, format);
       createForm.reset();
       renderTournamentsList();
     });
@@ -113,19 +110,41 @@ function renderTournamentsList() {
 
   tournaments.forEach(t => {
     const div = document.createElement('div');
-    div.classList.add('tournament-card');
+    div.classList.add('tournament-card'); // Flex kontejner
 
-    const safeName = t.name.toLowerCase().replaceAll(' ', '_');
-
+    // Za brisanje možeš koristiti emoji smeća (🗑), ili unicode &#128465;, 
+    // ili pak neki <svg> ili FontAwesome ikonicu (npr. <i class="fa fa-trash"></i>).
     div.innerHTML = `
-      <h4>${t.name} (Format: ${t.format})</h4>
-      <a href="tournament.html?t=${safeName}">
-        <button>Open</button>
-      </a>
-    `;
+  <div class="tournament-info">
+    <strong>${t.name || ''}</strong> (Format: ${t.format || ''})
+  </div>
+  <div class="tournament-actions">
+    <a href="tournament.html?t=${encodeURIComponent(t.name)}">
+      <button>Open</button>
+    </a>
+    <!-- Ikona za brisanje -->
+    <button class="delete-icon" onclick="deleteTournament('${t.id}')">🗑</button>
+  </div>
+`;
     container.appendChild(div);
   });
 }
+
+
+function deleteTournament(tournamentId) {
+  if (!confirm('Da li sigurno želiš obrisati ovaj turnir?')) {
+    return;
+  }
+
+  let tournaments = getTournaments();
+  // Filtriraj da ostanu svi osim onog s proslijeđenim ID-om
+  tournaments = tournaments.filter(t => t.id !== tournamentId);
+  saveTournaments(tournaments);
+  
+  // Osvježi prikaz
+  renderTournamentsList();
+}
+
 
 
 /***************************************************************
@@ -188,39 +207,38 @@ function openTournament(tournamentId) {
 /***************************************************************
  * ADD TEAM TO TOURNAMENT
  ***************************************************************/
-function addTeam(tournamentId) {
-  const nameInput = document.getElementById('newTeamName');
-  if (!nameInput.value.trim()) {
-    alert('Enter a team name');
-    return;
-  }
+function addTeam(tournamentId, newTeamName) {
   const tournaments = getTournaments();
-  const tournament = tournaments.find(t => t.id === tournamentId);
+  const index = tournaments.findIndex(t => t.id === tournamentId);
+  if (index === -1) return; // ne postoji turnir s tim ID-om
 
-  const newTeam = {
+  // Dodaj novi tim
+  tournaments[index].teams.push({
     id: generateId(),
-    name: nameInput.value.trim(),
+    name: newTeamName,
     players: []
-  };
-  tournament.teams.push(newTeam);
+  });
 
   saveTournaments(tournaments);
 
-  // Re-open the tournament to refresh
-  document.body.removeChild(document.querySelector('.overlay'));
-  openTournament(tournamentId);
+  // Ponovo dohvati turnir i renderiraj timove
+  const updatedTournament = tournaments[index];
+  renderTeams(updatedTournament);
 }
 
 /***************************************************************
  * OPEN TEAM - MANAGE PLAYERS
  ***************************************************************/
 function openTeam(tournamentId, teamId) {
-  const overlay = document.createElement('div');
-  overlay.classList.add('overlay');
-
   const tournaments = getTournaments();
   const tournament = tournaments.find(t => t.id === tournamentId);
+  if (!tournament) return;
+  
   const team = tournament.teams.find(tm => tm.id === teamId);
+  if (!team) return;
+
+  const overlay = document.createElement('div');
+  overlay.classList.add('overlay');
 
   overlay.innerHTML = `
     <div class="overlay-content">
@@ -234,8 +252,17 @@ function openTeam(tournamentId, teamId) {
 
       <div>
         <h3>Existing Players</h3>
-        <ul>
-          ${team.players.map(p => `<li>${p.name}</li>`).join('')}
+        <ul id="playersList">
+          ${
+            team.players.length === 0 
+              ? '<li>No players yet.</li>' 
+              : team.players.map(p => `
+                  <li>
+                    ${p.name}
+                    <button style="margin-left:10px;" onclick="deletePlayer('${tournamentId}', '${teamId}', '${p.id}')">🗑️</button>
+                  </li>
+                `).join('')
+          }
         </ul>
       </div>
     </div>
@@ -245,22 +272,28 @@ function openTeam(tournamentId, teamId) {
 
 function addPlayer(tournamentId, teamId) {
   const nameInput = document.getElementById('newPlayerName');
-  if (!nameInput.value.trim()) {
+  const playerName = nameInput.value.trim();
+  if (!playerName) {
     alert('Enter a player name');
     return;
   }
-  const tournaments = getTournaments();
-  const tournament = tournaments.find(t => t.id === tournamentId);
-  const team = tournament.teams.find(tm => tm.id === teamId);
 
+  const tournaments = getTournaments();
+  const tIndex = tournaments.findIndex(t => t.id === tournamentId);
+  if (tIndex === -1) return;
+
+  const team = tournaments[tIndex].teams.find(tm => tm.id === teamId);
+  if (!team) return;
+
+  // Dodaj igrača
   team.players.push({
     id: generateId(),
-    name: nameInput.value.trim()
+    name: playerName
   });
 
   saveTournaments(tournaments);
 
-  // Re-open the same overlay
+  // Zatvori i ponovo otvori overlay da se osvježi
   document.body.removeChild(document.querySelector('.overlay'));
   openTeam(tournamentId, teamId);
 }
@@ -320,14 +353,16 @@ function renderMatchesHtml(tournament) {
   tournament.matches.forEach(m => {
     const team1 = tournament.teams.find(t => t.id === m.team1Id);
     const team2 = tournament.teams.find(t => t.id === m.team2Id);
-    
+    const team1Name = team1 ? team1.name : 'Unknown';
+    const team2Name = team2 ? team2.name : 'Unknown';
+
     const winnerText = m.played
-      ? (m.team1Sets > m.team2Sets ? team1.name + ' WON' : team2.name + ' WON')
+      ? (m.team1Sets > m.team2Sets ? (team1Name + ' WON') : (team2Name + ' WON'))
       : 'Not played yet';
 
     html += `
       <div class="match-card">
-        <p><strong>${team1.name}</strong> vs <strong>${team2.name}</strong></p>
+        <p><strong>${team1Name}</strong> vs <strong>${team2Name}</strong></p>
         <p>Match Result: ${m.team1Sets} : ${m.team2Sets}</p>
         <p>Winner: ${winnerText}</p>
         <button onclick="openMatchEditor('${tournament.id}','${m.id}')">Record Results</button>
@@ -340,57 +375,112 @@ function renderMatchesHtml(tournament) {
 /***************************************************************
  * OPEN MATCH EDITOR (to enter set scores)
  ***************************************************************/
+/* === openMatchEditor.js === */
+
 function openMatchEditor(tournamentId, matchId) {
+  // 1) Napravi overlay div
   const overlay = document.createElement('div');
   overlay.classList.add('overlay');
 
+  // 2) Dohvati turnir i meč
   const tournaments = getTournaments();
   const tournament = tournaments.find(t => t.id === tournamentId);
+  if (!tournament) {
+    alert("Tournament not found!");
+    return;
+  }
   const match = tournament.matches.find(m => m.id === matchId);
+  if (!match) {
+    alert("Match not found!");
+    return;
+  }
+
+  // 3) Pronađi ekipe
   const team1 = tournament.teams.find(t => t.id === match.team1Id);
   const team2 = tournament.teams.find(t => t.id === match.team2Id);
+  if (!team1 || !team2) {
+    alert("Teams not found in this match!");
+    return;
+  }
 
-  // Pripremi 5 praznih mečeva ako ih nema
+  // 4) Ako individualMatches ne postoji, inicijaliziraj
+  if (!match.individualMatches) {
+    match.individualMatches = [];
+  }
+
+  // 5) DOPUNI do 5 mečeva (ništa ne brišemo!)
   while (match.individualMatches.length < 5) {
     match.individualMatches.push({
       player1Name: "",
       player2Name: "",
-      player1Sets: ["", "", "", "", ""],
-      player2Sets: ["", "", "", "", ""],
+      player1Sets: ["","","","",""],
+      player2Sets: ["","","","",""],
       winner: null
     });
   }
 
-   // Renderuj formu
-   let rowsHtml = "";
-      match.individualMatches.forEach((im, index) => {
-          const setInputs = Array(5).fill(0).map((_, i) => `
-    <input type="text" class="set-input" placeholder="11:9"
-    id="set_${index}_${i}" oninput="calculateIndividualResult(${index})">
-  `).join('');
+  // 6) Složi HTML redove forme
+  let rowsHtml = "";
+  match.individualMatches.forEach((im, rowIndex) => {
+    // a) Dropdown za team1
+    const team1PlayersOptions = team1.players.map(p => {
+      const selected = (p.name === im.player1Name) ? "selected" : "";
+      return `<option value="${p.name}" ${selected}>${p.name}</option>`;
+    }).join("");
 
+    // b) Dropdown za team2
+    const team2PlayersOptions = team2.players.map(p => {
+      const selected = (p.name === im.player2Name) ? "selected" : "";
+      return `<option value="${p.name}" ${selected}>${p.name}</option>`;
+    }).join("");
 
+    // c) Input polja za setove (npr. 5 inputa "11:9")
+    let setInputs = "";
+    for (let i = 0; i < 5; i++) {
+      const s1 = im.player1Sets[i];
+      const s2 = im.player2Sets[i];
+      // Ako su oba broja upisana, spoji ih u "11:9", inače ostavi prazno
+      const val = (s1 !== "" && s2 !== "") ? (s1 + ":" + s2) : "";
+      // Dodaj "oninput" da odmah računamo parcijalni rezultat:
+      setInputs += `
+        <input type="text" class="set-input"
+               id="set_${rowIndex}_${i}"
+               value="${val}"
+               placeholder="11:9"
+               oninput="calculateIndividualResult(${rowIndex})" />
+      `;
+    }
 
+    // d) Tekstualni prikaz rezultata (npr. "3 - 0 ✅")
+    let resultText = "-";
+    if (im.winner === 1) {
+      resultText = "3 - 0 ✅";
+    } else if (im.winner === 2) {
+      resultText = "0 - 3 ✅";
+    }
+
+    // e) Spoji sve u jedan <tr>
     rowsHtml += `
       <tr>
         <td>
-          <select id="p1_${index}">
+          <select id="p1_${rowIndex}">
             <option value="">-- Player --</option>
-            ${team1.players.map(p => `<option value="${p.name}" ${p.name === im.player1Name ? "selected" : ""}>${p.name}</option>`).join('')}
+            ${team1PlayersOptions}
           </select>
         </td>
         <td>
-          <select id="p2_${index}">
+          <select id="p2_${rowIndex}">
             <option value="">-- Player --</option>
-            ${team2.players.map(p => `<option value="${p.name}" ${p.name === im.player2Name ? "selected" : ""}>${p.name}</option>`).join('')}
+            ${team2PlayersOptions}
           </select>
         </td>
         <td>${setInputs}</td>
-        <td id="result_${index}">${im.winner ? (im.winner === 1 ? "1:0" : "0:1") : "-"}</td>
+        <td id="result_${rowIndex}">${resultText}</td>
       </tr>
     `;
   });
 
+  // 7) Sastavi cijeli overlay
   overlay.innerHTML = `
     <div class="overlay-content">
       <h2>Record Results: ${team1.name} vs ${team2.name}</h2>
@@ -415,73 +505,121 @@ function openMatchEditor(tournamentId, matchId) {
     </div>
   `;
 
+  // 8) Dodaj overlay u dokument
   document.body.appendChild(overlay);
 }
 
+
+
+/* === saveMatchResults.js === */
 function saveMatchResults(tournamentId, matchId) {
   const tournaments = getTournaments();
   const tournament = tournaments.find(t => t.id === tournamentId);
+  if (!tournament) {
+    alert("Tournament not found!");
+    return;
+  }
   const match = tournament.matches.find(m => m.id === matchId);
+  if (!match) {
+    alert("Match not found!");
+    return;
+  }
 
+  // Reset ukupnog rezultata meča (broj individualnih pobjeda)
   match.team1Sets = 0;
   match.team2Sets = 0;
 
-  match.individualMatches.forEach((im, index) => {
-    const p1 = document.getElementById(`p1_${index}`).value;
-    const p2 = document.getElementById(`p2_${index}`).value;
-
-    im.player1Name = p1;
-    im.player2Name = p2;
-    im.player1Sets = [];
-    im.player2Sets = [];
+  // Prođi kroz svih (do) 5 individualnih partija
+  match.individualMatches.forEach((im, rowIndex) => {
+    // Pokupi selektirane igrače
+    const p1Select = document.getElementById(`p1_${rowIndex}`);
+    const p2Select = document.getElementById(`p2_${rowIndex}`);
+    im.player1Name = p1Select ? p1Select.value : "";
+    im.player2Name = p2Select ? p2Select.value : "";
 
     let p1SetWins = 0;
     let p2SetWins = 0;
 
+    // Parsiraj do 5 setova iz input polja
     for (let i = 0; i < 5; i++) {
-      const raw = document.getElementById(`set_${index}_${i}`).value;
-      if (!raw || raw.toLowerCase() === 'na') continue;
+      const setInput = document.getElementById(`set_${rowIndex}_${i}`);
+      if (!setInput) {
+        im.player1Sets[i] = "";
+        im.player2Sets[i] = "";
+        continue;
+      }
+
+      const raw = setInput.value.trim(); // npr. "11:9"
+      if (!raw) {
+        im.player1Sets[i] = "";
+        im.player2Sets[i] = "";
+        continue;
+      }
 
       const parts = raw.split(':');
-      if (parts.length !== 2) continue;
+      if (parts.length !== 2) {
+        im.player1Sets[i] = "";
+        im.player2Sets[i] = "";
+        continue;
+      }
 
-      const s1 = parseInt(parts[0]);
-      const s2 = parseInt(parts[1]);
-      if (isNaN(s1) || isNaN(s2)) continue;
+      const s1 = parseInt(parts[0], 10);
+      const s2 = parseInt(parts[1], 10);
+      if (isNaN(s1) || isNaN(s2)) {
+        im.player1Sets[i] = "";
+        im.player2Sets[i] = "";
+        continue;
+      }
 
+      // Spremi set rezultat
       im.player1Sets[i] = s1;
       im.player2Sets[i] = s2;
 
+      // Tko je dobio set
       if (s1 > s2) p1SetWins++;
       else if (s2 > s1) p2SetWins++;
     }
 
+    // Odredi winner te partije
     if (p1SetWins >= 3) {
       im.winner = 1;
-      match.team1Sets += 1;
+      match.team1Sets++; // Ekipa 1 dobila ovu individualnu
     } else if (p2SetWins >= 3) {
       im.winner = 2;
-      match.team2Sets += 1;
+      match.team2Sets++; // Ekipa 2
     } else {
-      im.winner = null;
+      im.winner = null; // nije odlučeno
     }
   });
 
-  // Ako jedan tim ima 3 pobjede – završi meč
+  // Ako jedna ekipa ima >=3 individualnih pobjeda, meč je odigran
   if (match.team1Sets >= 3 || match.team2Sets >= 3) {
     match.played = true;
   } else {
     match.played = false;
   }
 
+  // Spremi u localStorage
   saveTournaments(tournaments);
 
   // Zatvori popup
-  document.body.removeChild(document.querySelector('.overlay'));
+  const overlayEl = document.querySelector('.overlay');
+  if (overlayEl) {
+    document.body.removeChild(overlayEl);
+  }
 
-  // Reloaduj turnir stranicu
-  window.location.reload();
+  // Osvježi prikaz mečeva i standings (ako postoji na stranici)
+  // Primjer: 
+  const matchesListEl = document.getElementById('matchesList');
+  if (matchesListEl) {
+    matchesListEl.innerHTML = renderMatchesHtml(tournament);
+  }
+  const standingsTableEl = document.getElementById('standingsTable');
+  if (standingsTableEl) {
+    standingsTableEl.innerHTML = generateStandingsTable(tournament);
+  }
 }
+
 
 
 /***************************************************************
@@ -644,6 +782,28 @@ function initDashboard() {
   }
 }
 
+function renderTeams(tournament) {
+  const teamsContainer = document.getElementById('teamsList');
+  if (!teamsContainer) return;
+
+  if (!tournament.teams || tournament.teams.length === 0) {
+    teamsContainer.innerHTML = "<p>No teams yet.</p>";
+    return;
+  }
+
+  let html = '';
+  tournament.teams.forEach(team => {
+    html += `
+      <div class="team-card">
+        <strong>${team.name}</strong>
+        <button onclick="openTeam('${tournament.id}', '${team.id}')">Manage Players</button>
+      </div>
+    `;
+  });
+
+  teamsContainer.innerHTML = html;
+}
+
 
 function openTeam(tournamentId, teamId) {
   const overlay = document.createElement('div');
@@ -681,28 +841,38 @@ function openTeam(tournamentId, teamId) {
 
 function deletePlayer(tournamentId, teamId, playerId) {
   const tournaments = getTournaments();
-  const tournament = tournaments.find(t => t.id === tournamentId);
-  const team = tournament.teams.find(tm => tm.id === teamId);
+  const tIndex = tournaments.findIndex(t => t.id === tournamentId);
+  if (tIndex === -1) return;
 
+  const team = tournaments[tIndex].teams.find(tm => tm.id === teamId);
+  if (!team) return;
+
+  // Filtriraj iz niza
   team.players = team.players.filter(p => p.id !== playerId);
-
   saveTournaments(tournaments);
 
-  // Refresh overlay
+  // Zatvori i ponovo otvori overlay
   document.body.removeChild(document.querySelector('.overlay'));
   openTeam(tournamentId, teamId);
 }
 
 function generateStandingsTable(tournament) {
-  const standings = tournament.teams.map(team => {
-    const matches = tournament.matches.filter(m => m.played && (m.team1Id === team.id || m.team2Id === team.id));
+  const teams = tournament.teams || [];
+  const matches = tournament.matches || [];
+
+  if (!teams.length) return '<p>No teams in this tournament.</p>';
+
+  // Napravi "statistiku" za svaku ekipu
+  const standings = teams.map(team => {
+    const playedMatches = matches.filter(m => m.played && (m.team1Id === team.id || m.team2Id === team.id));
     let wins = 0;
     let losses = 0;
 
-    matches.forEach(m => {
-      const isTeam1 = m.team1Id === team.id;
-      const won = (isTeam1 && m.team1Sets > m.team2Sets) || (!isTeam1 && m.team2Sets > m.team1Sets);
-      if (won) wins++;
+    playedMatches.forEach(m => {
+      const isTeam1 = (m.team1Id === team.id);
+      const team1Won = m.team1Sets > m.team2Sets;
+      const winnerIsThisTeam = (isTeam1 && team1Won) || (!isTeam1 && !team1Won);
+      if (winnerIsThisTeam) wins++;
       else losses++;
     });
 
@@ -714,6 +884,7 @@ function generateStandingsTable(tournament) {
     };
   });
 
+  // Sortiraj po broju pobjeda
   standings.sort((a, b) => b.wins - a.wins);
 
   let html = `
@@ -742,30 +913,39 @@ function calculateIndividualResult(rowIndex) {
   let p1Wins = 0;
   let p2Wins = 0;
 
+  // Prođi kroz 5 polja za dati rowIndex
   for (let i = 0; i < 5; i++) {
-    const raw = document.getElementById(`set_${rowIndex}_${i}`).value;
-    if (!raw || raw.toLowerCase() === 'na') continue;
+    const inputEl = document.getElementById(`set_${rowIndex}_${i}`);
+    if (!inputEl) continue;
+
+    const raw = inputEl.value.trim(); // npr. "11:9"
+    if (!raw) continue; // prazno polje -> preskačemo
 
     const parts = raw.split(':');
-    if (parts.length !== 2) continue;
+    if (parts.length !== 2) continue; // mora biti "broj:broj"
 
-    const s1 = parseInt(parts[0]);
-    const s2 = parseInt(parts[1]);
-
+    const s1 = parseInt(parts[0], 10);
+    const s2 = parseInt(parts[1], 10);
     if (isNaN(s1) || isNaN(s2)) continue;
 
+    // Ko je dobio set
     if (s1 > s2) p1Wins++;
     else if (s2 > s1) p2Wins++;
   }
 
+  // Ažuriraj prikaz
   const resultEl = document.getElementById(`result_${rowIndex}`);
+  if (!resultEl) return;
+
   if (p1Wins === 0 && p2Wins === 0) {
     resultEl.innerHTML = '-';
     return;
   }
 
-  const isFinished = p1Wins === 3 || p2Wins === 3;
+  // Ako netko stigne do 3, stavi neku kvačicu
+  const isFinished = (p1Wins >= 3 || p2Wins >= 3);
   const checkIcon = isFinished ? ' ✅' : '';
   resultEl.innerHTML = `${p1Wins} - ${p2Wins}${checkIcon}`;
 }
+
 

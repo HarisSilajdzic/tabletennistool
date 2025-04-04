@@ -9,11 +9,25 @@
   <div class="container">
     <h1 id="tournamentTitle">Loading tournament...</h1>
 
+    <!-- Sekcija za prikaz i dodavanje timova -->
+    <section id="teamsSection">
+      <h2>Teams</h2>
+      <form id="addTeamForm" style="margin-bottom:1rem;">
+        <input type="text" id="newTeamName" placeholder="Team name" required />
+        <button type="submit">Add Team</button>
+      </form>
+      <div id="teamsList"></div>
+    </section>
+
+    <hr />
+
+    <!-- Sekcija za prikaz mečeva -->
     <section id="matchesSection">
       <h2>Matches</h2>
       <div id="matchesList"></div>
     </section>
 
+    <!-- Sekcija za tablicu (standings) -->
     <section id="tableSection">
       <h2>Standings</h2>
       <div id="standingsTable"></div>
@@ -21,7 +35,10 @@
   </div>
 
   <script src="app.js"></script>
+
   <script>
+    let currentTournament = null;
+
     function initTournamentPage() {
       const urlParams = new URLSearchParams(window.location.search);
       const nameParam = urlParams.get('t');
@@ -31,19 +48,41 @@
         return;
       }
 
+      // Pretvori npr. "moja_liga" -> "moja liga"
       const tournamentName = nameParam.replaceAll('_', ' ');
       document.getElementById('tournamentTitle').textContent = tournamentName;
 
+      // Pronađi turnir u localStorage
       const tournaments = getTournaments();
       const tournament = tournaments.find(t => t.name.toLowerCase() === tournamentName.toLowerCase());
-
       if (!tournament) {
         document.getElementById('matchesList').innerHTML = "<p>Tournament not found.</p>";
         return;
       }
 
+      currentTournament = tournament; // Spremi ga globalno ako treba
+
+      // 1) RENDER mečeve
       document.getElementById('matchesList').innerHTML = renderMatchesHtml(tournament);
+
+      // 2) RENDER standings
       document.getElementById('standingsTable').innerHTML = generateStandingsTable(tournament);
+
+      // 3) RENDER timove
+      renderTeams(tournament);
+
+      // 4) Uveži formu za dodavanje tima
+      const form = document.getElementById('addTeamForm');
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const newTeamName = document.getElementById('newTeamName').value.trim();
+        if (!newTeamName) {
+          alert('Please enter a team name');
+          return;
+        }
+        addTeam(tournament.id, newTeamName);
+        document.getElementById('newTeamName').value = "";
+      });
     }
 
     initTournamentPage();

@@ -82,10 +82,37 @@ button {
 }
 
 /* TOURNAMENT LIST */
+/* ADDED/UPDATED */
 .tournament-card {
+  display: flex;                /* Fleks kontejner */
+  justify-content: space-between;
+  align-items: center;
   border: 1px solid #ccc;
   margin: 0.5rem 0;
   padding: 0.5rem;
+}
+
+.tournament-info {
+  /* Lijevi dio unutar tournament-card, ako želiš dodatni stil tu ga možeš staviti */
+}
+
+.tournament-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* razmak između gumbića */
+}
+
+/* Ako želiš samo ikonicu smeća bez pozadine... */
+.delete-icon {                         /* ADDED */
+  background: none;
+  border: none;
+  font-size: 20px;       /* Podesi po želji */
+  cursor: pointer;
+  color: #e74c3c;        /* Crvena ikonica */
+  line-height: 1;        /* Da bolje centriramo ikonu */
+}
+.delete-icon:hover {                    /* ADDED */
+  color: #c0392b;         /* Tamnija crvena na hover */
 }
 
 /* OVERLAY */
